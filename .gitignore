@@ -5,3 +5,4 @@ __pycache__/*
  jorbs_jobs/*
 *.txt
 *.html
+*.csv
