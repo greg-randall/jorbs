@@ -12,27 +12,29 @@ import tldextract
 import urllib
 
 
-from jorbs_config import *
+from jorbs_config import * #make sure to copy and rename 'jorbs_config_blank.py' to  'jorbs_config.py'
 from jorbs_functions import *
 
 
-time_stamp = int(time.time()) #have a conistent timestamp for all of the logging from the start of the run
+timestamp = int(time.time()) #have a conistent timestamp for all of the logging from the start of the run
 
 aggregators_rss_url = []
 for aggregator in aggregators_rss:
-    print(f"rss: {aggregator}")
+    print(f"feed: {aggregator}")
     for keyword in search_keywords:
         print(f"\tkeyword: {keyword}")
 
-        keyword_encded = urllib.parse.quote_plus(keyword) #urlencode the search string -- ie spaces turn to %20.
-        url = f"{aggregator}{keyword_encded}" #build the actual url for collection 
+        keyword_encded = urllib.parse.quote_plus(keyword) #urlencode the search string -- ie spaces turn to %20, quotes to %22.
+        
+        url = f"{aggregator}{keyword_encded}" #build the url for collection 
 
         feed_raw = get_feed(url)
+        write_log_item("jorbs_feeds",aggregator,keyword,timestamp,feed_raw) #logging the feeds for later troubleshooting
 
-        links = get_links_from_feed(feed_raw) #get the links from the feed
+        job_links = get_links_from_feed(feed_raw) #get the links from the feed
 
-        write_feed_log(aggregator,keyword,time_stamp,feed_raw)
+        for job_link in job_links:
+            print(f"\t\tjob: {job_link}")
 
-        for link in links:
-            print(f"\t\tlink: {link}")
-
+            job_description = get_jorb( job_link ) #collect the page with the job description
+            write_log_item("jorbs_jobs",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
