@@ -138,10 +138,12 @@ def get_jorb(url):
 
     if domain in jobsite_container_class.keys():
         elements = soup.find_all("div", class_ = jobsite_container_class[domain]) #need to find
+        text = elements[0].get_text(separator=' ') #get text but add spaces around elements
     else:
         print(f"NOTE: did not recognize jobsite {domain}, consider adding to get_jorb function")
+        text = soup.get_text(separator=' ')
 
-    text = elements[0].get_text(separator=' ') #get text but add spaces around elements
+    
     text = html.unescape(text) #fixes html escaped text, like the &nbsp; nonbreaking space
     text = re.sub('[^\S\r\n]+', ' ', text) #remove doubled spaces
     text = re.sub('\n+\s*\n+','\n', text) #remove extra linebreaks
