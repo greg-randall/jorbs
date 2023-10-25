@@ -1,6 +1,9 @@
 import asyncio
 from bs4 import BeautifulSoup
-import html 
+from csv import writer
+import datetime
+import html
+import openai
 import os
 from pyppeteer import launch
 from pyppeteer_stealth import stealth
@@ -8,6 +11,7 @@ import re
 import time
 import tldextract
 import uuid
+
 
 
 # download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
@@ -76,6 +80,7 @@ def write_log_item(path,aggregator,keyword,timestamp,feed_raw):
 #download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
 def get_jorb(url):
     #wrapper class for part of the page we're interested in.
+    #find the smallest class that wraps the entire job description
     jobsite_container_class={ 
         "indeed": "jobsearch-JobComponent",
         "chronicle": "mds-surface",
@@ -104,13 +109,15 @@ def get_jorb(url):
 
     soup = BeautifulSoup(page,features="lxml") #start up beautifulsoup
 
-    #need to do some per-site cleaning to remove extra text:
+    #remove script and style tags
+    for script_tags in soup.select('script'): 
+        script_tags.extract()
+    for style_tags in soup.select('style'): 
+        style_tags.extract()
 
+
+    #need to do some per-site cleaning to remove extra text:
     if domain == "hercjobs":
-        for script_tags in soup.select('script'): 
-            script_tags.extract()
-        for style_tags in soup.select('style'): 
-            style_tags.extract()
         for div in soup.find_all("div", {'class':'d-print-none'}): 
             div.decompose()
         for button_tags in soup.select('button'): 
@@ -150,3 +157,36 @@ def get_jorb(url):
     text = re.sub('\n\s+','\n', text) #remove spaces at the start of lines
     
     return text
+
+
+#get chatgpt to parse our job
+def gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key):
+
+    prompt = f"{gpt_base_prompt}{job_description}" #build our prompt
+
+    openai.api_key = open_ai_key
+    completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
+    reply = completion.choices[0].message.content #just get the reply message which is what we care about
+   
+    return reply
+
+
+def split_gpt(read_job,job_link):
+    read_job = read_job.splitlines() #split the chat output by linebreaks
+
+    read_job.reverse() #this is probably showing my python inexpereince, but fipping to prepend data
+    read_job.append(job_link)
+
+    d_date = datetime.datetime.now()
+    read_job.append(d_date.strftime("%m-%d-%Y %I:%M%p"))
+
+    read_job.reverse()
+
+    return read_job
+
+
+def write_jorb_csv_log(output):
+    with open('collected_jorbs.csv', 'a') as f_object: #write the output as a csv
+        writer_object = writer(f_object)
+        writer_object.writerow(output)
+        f_object.close()

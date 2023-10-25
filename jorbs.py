@@ -1,5 +1,6 @@
 import asyncio
 from bs4 import BeautifulSoup
+from csv import writer
 import feedparser #pip3 install feedparser
 import hashlib
 import html 
@@ -38,3 +39,10 @@ for aggregator in aggregators_rss:
 
             job_description = get_jorb( job_link ) #collect the page with the job description
             write_log_item("jorbs_jobs",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
+
+            read_job = gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key)
+
+            final_job_output = split_gpt(read_job,job_link)
+            print(f"\t\t\tjob data: {final_job_output}")
+
+            write_jorb_csv_log(final_job_output)
