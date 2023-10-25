@@ -1,3 +1,5 @@
+open_ai_key = "....."
+
 #aggregators, format so that the keyword part is at the end
 aggregators_rss = [
     "https://careers.insidehighered.com/jobsrss/?countrycode=US&keywords=",
@@ -14,3 +16,16 @@ search_keywords = [
     'fullstack',
     ]
 
+
+gpt_base_prompt = '''\
+    Please read the job description below.
+
+    Determine if the job is related web development, answer TRUE or FALSE.
+    Output a linebreak.
+    Find pay information, reply with a dollar amount otherwise answer FALSE.
+    Output a linebreak.
+    Determine if the location of the job, answer in the form of CITY, STATE, if the answer isn't in the form of 'CITY, STATE' answer FALSE.
+
+    
+    Job Description:
+    '''
