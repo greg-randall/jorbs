@@ -3,5 +3,5 @@ jorbs_feeds/*
 test.py
 __pycache__/*
  jorbs_jobs/*
- *.txt
+*.txt
 *.html
