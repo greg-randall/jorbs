@@ -136,7 +136,10 @@ def get_jorb(url):
         for div in soup.find_all("div", {'job-sticky-ctas'}):
             div.decompose()
 
-    elements = soup.find_all("div", class_ = jobsite_container_class[domain]) #need to find
+    if domain in jobsite_container_class.keys():
+        elements = soup.find_all("div", class_ = jobsite_container_class[domain]) #need to find
+    else:
+        print(f"NOTE: did not recognize jobsite {domain}, consider adding to get_jorb function")
 
     text = elements[0].get_text(separator=' ') #get text but add spaces around elements
     text = html.unescape(text) #fixes html escaped text, like the &nbsp; nonbreaking space
