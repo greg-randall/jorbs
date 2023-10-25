@@ -1,7 +1,5 @@
 import asyncio
 from bs4 import BeautifulSoup
-import feedparser #pip3 install feedparser
-import hashlib
 import html 
 import os
 from pyppeteer import launch
@@ -9,7 +7,8 @@ from pyppeteer_stealth import stealth
 import re
 import time
 import tldextract
-import urllib
+import uuid
+
 
 # download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
 def get_feed(url): 
@@ -55,22 +54,94 @@ def get_links_from_feed(feed_raw):
 
 
 #write out the feed
-def write_feed_log(aggregator,keyword,time_stamp,feed_raw): 
-    if not os.path.exists("jorbs_feeds"):#make feed log folder if it doesn't exist
-        os.mkdir("jorbs_feeds") 
+def write_log_item(path,aggregator,keyword,timestamp,feed_raw): 
+    if not os.path.exists(path):#make feed log folder if it doesn't exist
+        os.mkdir(path) 
 
-    if not os.path.exists(f"jorbs_feeds/{time_stamp}"):#make feed log subfolder folder if it doesn't exist
-        os.mkdir(f"jorbs_feeds/{time_stamp}") 
+    if not os.path.exists(f"{path}/{timestamp}"):#make feed log subfolder folder if it doesn't exist
+        os.mkdir(f"{path}/{timestamp}") 
 
     domain = tldextract.extract(aggregator) #get domain by itself for feed logging filenames
     domain = domain.domain
 
+
     keyword_clean = re.sub('"','', keyword) #clean the keywords for logging filenames
     keyword_clean = re.sub('[^a-zA-Z_-]','_', keyword_clean)
 
-    f = open(f"jorbs_feeds/{time_stamp}/{domain}_{keyword_clean}_{int(time.time())}.xml", "w") #write out the raw feed for reference
+
+    f = open(f"{path}/{timestamp}/{domain}_k-{keyword_clean}_t-{int(time.time())}_uuid-{uuid.uuid4().hex}.txt", "w") #write out the raw feed for reference
     f.write(feed_raw)
     f.close()
 
+#download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
+def get_jorb(url):
+    #wrapper class for part of the page we're interested in.
+    jobsite_container_class={ 
+        "indeed": "jobsearch-JobComponent",
+        "chronicle": "mds-surface",
+        "insidehighered": "mds-surface",
+        "hercjobs": "bti-job-detail-pane",
+        "timeshighereducation": "js-job-detail",
+    }
 
+    domain = tldextract.extract(url)
+    domain = domain.domain
 
+    async def get_page(): #startin up the pyppeteer
+        browser = await launch()
+        page = await browser.newPage()
+
+        await stealth(page) #lookin at you indeed
+
+        await page.goto(url)
+
+        page = await page.content()
+        await browser.close()
+
+        return page
+
+    page = asyncio.get_event_loop().run_until_complete(get_page()) #get the page raw output
+
+    soup = BeautifulSoup(page,features="lxml") #start up beautifulsoup
+
+    #need to do some per-site cleaning to remove extra text:
+
+    if domain == "hercjobs":
+        for script_tags in soup.select('script'): 
+            script_tags.extract()
+        for style_tags in soup.select('style'): 
+            style_tags.extract()
+        for div in soup.find_all("div", {'class':'d-print-none'}): 
+            div.decompose()
+        for button_tags in soup.select('button'): 
+            button_tags.extract()
+        for div in soup.find_all("div", {'modal'}): 
+            div.decompose()
+
+    if domain == "insidehighered" or domain == "chronicle":
+        for div in soup.find_all("div", {'mds-text-align-right'}):
+            div.decompose()
+        for div in soup.find_all("div", {'mds-border-top'}):
+            div.decompose()
+
+    if domain == "timeshighereducation":
+        for ul in soup.find_all("ul", {'job-actions'}):
+            ul.decompose()
+        for div in soup.find_all("div", {'float-right'}):
+            div.decompose()
+        for div in soup.find_all("div", {'premium-disabled'}):
+            div.decompose()
+        for span in soup.find_all("span", {'hidden'}):
+            span.decompose()
+        for div in soup.find_all("div", {'job-sticky-ctas'}):
+            div.decompose()
+
+    elements = soup.find_all("div", class_ = jobsite_container_class[domain]) #need to find
+
+    text = elements[0].get_text(separator=' ') #get text but add spaces around elements
+    text = html.unescape(text) #fixes html escaped text, like the &nbsp; nonbreaking space
+    text = re.sub('[^\S\r\n]+', ' ', text) #remove doubled spaces
+    text = re.sub('\n+\s*\n+','\n', text) #remove extra linebreaks
+    text = re.sub('\n\s+','\n', text) #remove spaces at the start of lines
+    
+    return text
