@@ -39,7 +39,12 @@ for aggregator in aggregators_rss:
 
                     if read_job:
                         final_job_output = split_gpt(read_job,job_link)
-                        print(f"      job data: {final_job_output}")
+
+                        final_job_output_screen = final_job_output #drop the link and the time off the screen output
+                        del final_job_output_screen[0]
+                        del final_job_output_screen[0]
+
+                        print(f"      job data: {final_job_output_screen}")
 
                         write_jorb_csv_log(final_job_output,timestamp)
                     else:

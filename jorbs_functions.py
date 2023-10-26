@@ -172,20 +172,17 @@ def get_jorb(url):
 
 #get chatgpt to parse our job
 def gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key):
-
-    prompt = f"{gpt_base_prompt}{job_description}" #build our prompt
-
     openai.api_key = open_ai_key
 
+    prompt = f"{gpt_base_prompt}{job_description}" #build our prompt
+    
     try:
         completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
     except:
         return False
     
     reply = completion.choices[0].message.content #just get the reply message which is what we care about
-   
     return reply
-
 
 def split_gpt(read_job,job_link):
     read_job = read_job.splitlines() #split the chat output by linebreaks
