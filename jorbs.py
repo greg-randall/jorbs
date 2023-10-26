@@ -1,10 +1,13 @@
 import time
 import urllib
-
+import random
 
 from jorbs_config import * #make sure to copy and rename 'jorbs_config_blank.py' to  'jorbs_config.py'
 from jorbs_functions import *
 
+#randomize list order
+random.shuffle(aggregators_rss)
+random.shuffle(search_keywords)
 
 timestamp = int(time.time()) #have a conistent timestamp for all of the logging from the start of the run
 

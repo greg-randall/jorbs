@@ -43,6 +43,7 @@ def get_links_from_feed(feed_raw):
     raw_links = re.findall('<link>h[^<]*</link>', feed_raw) #using regex for the feed link collection. feeds are that come out of pyppeteer are malformed since chrome formats them
 
     output_links = []
+    output_links_clean = []
 
     if len(raw_links)>1:
 
@@ -57,7 +58,18 @@ def get_links_from_feed(feed_raw):
         if output_links[0] == "https://www.indeed.com/": #indeed sometimes outputs an extra link to itself at the start of the file
            output_links.pop(0) 
 
-    return output_links
+        #going to clean the links a bit, most links have some query string stuff that isn't needed, exceept indeed, which has the job id in the query string.
+        #doing this so that we lose all the unique tracking IDs or whatever on the link, so later on it'll be easier to see if we've already looked at a link.
+        for output_link in output_links:
+            domain = tldextract.extract(output_link) #get domain by itself
+            domain = domain.domain
+            if domain =="indeed":
+                output_links_clean.append(output_link.split("&rtk=", 1)[0]) #indeed keeps a job id in the query string, but the text after 'rtk' isn't needed and changes
+            else:
+                output_links_clean.append(output_link.split("?", 1)[0])
+
+
+    return output_links_clean
 
 
 #write out the feed
