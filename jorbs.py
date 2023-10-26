@@ -12,26 +12,39 @@ aggregators_rss_url = []
 for aggregator in aggregators_rss:
     print(f"feed: {aggregator}")
     for keyword in search_keywords:
-        print(f"\tkeyword: {keyword}")
+        print(f"  keyword: {keyword}")
 
         keyword_encded = urllib.parse.quote_plus(keyword) #urlencode the search string -- ie spaces turn to %20, quotes to %22.
         
         url = f"{aggregator}{keyword_encded}" #build the url for collection 
 
         feed_raw = get_feed(url)
-        write_log_item("jorbs_feeds",aggregator,keyword,timestamp,feed_raw) #logging the feeds for later troubleshooting
 
-        job_links = get_links_from_feed(feed_raw) #get the links from the feed
+        if feed_raw:
+            
+            write_log_item("jorbs_feeds",aggregator,keyword,timestamp,feed_raw) #logging the feeds for later troubleshooting
 
-        for job_link in job_links:
-            print(f"\t\tjob: {job_link}")
+            job_links = get_links_from_feed(feed_raw) #get the links from the feed
 
-            job_description = get_jorb( job_link ) #collect the page with the job description
-            write_log_item("jorbs_jobs",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
+            for job_link in job_links:
 
-            read_job = gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key)
+                print(f"    job: {job_link}")
 
-            final_job_output = split_gpt(read_job,job_link)
-            print(f"\t\t\tjob data: {final_job_output}")
+                job_description = get_jorb( job_link ) #collect the page with the job description
+                if job_description:
 
-            write_jorb_csv_log(final_job_output,timestamp)
+                    write_log_item("jorbs_jobs",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
+
+                    read_job = gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key)
+
+                    if read_job:
+                        final_job_output = split_gpt(read_job,job_link)
+                        print(f"      job data: {final_job_output}")
+
+                        write_jorb_csv_log(final_job_output,timestamp)
+                    else:
+                        print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
+                else:
+                    print ("ERROR: something happened with the above job in when we tried to get the job description")
+        else:
+            print ("ERROR: something happened with the above rss feed when we tried to download it")
