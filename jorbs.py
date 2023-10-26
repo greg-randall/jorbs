@@ -1,15 +1,4 @@
-import asyncio
-from bs4 import BeautifulSoup
-from csv import writer
-import feedparser #pip3 install feedparser
-import hashlib
-import html 
-import os
-from pyppeteer import launch
-from pyppeteer_stealth import stealth
-import re
 import time
-import tldextract
 import urllib
 
 
@@ -45,4 +34,4 @@ for aggregator in aggregators_rss:
             final_job_output = split_gpt(read_job,job_link)
             print(f"\t\t\tjob data: {final_job_output}")
 
-            write_jorb_csv_log(final_job_output)
+            write_jorb_csv_log(final_job_output,timestamp)

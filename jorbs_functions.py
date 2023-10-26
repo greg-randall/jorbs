@@ -28,7 +28,10 @@ def get_feed(url):
 
         return feed_raw
 
-    feed_raw = asyncio.get_event_loop().run_until_complete(get_feed_raw()) #get the feed output
+    try:
+        feed_raw = asyncio.get_event_loop().run_until_complete(get_feed_raw()) #get the feed output
+    except:
+        return False
 
     feed_raw = html.unescape(feed_raw) #unescape the feed, sometimes feeds come from pyppeteer with the xml brackets encoded
 
@@ -92,6 +95,7 @@ def get_jorb(url):
     domain = tldextract.extract(url)
     domain = domain.domain
 
+    
     async def get_page(): #startin up the pyppeteer
         browser = await launch()
         page = await browser.newPage()
@@ -105,11 +109,14 @@ def get_jorb(url):
 
         return page
 
-    page = asyncio.get_event_loop().run_until_complete(get_page()) #get the page raw output
+    try:
+        page = asyncio.get_event_loop().run_until_complete(get_page()) #get the page raw output
+    except:
+        return False
 
     soup = BeautifulSoup(page,features="lxml") #start up beautifulsoup
 
-    #remove script and style tags
+    #remove script and style tags, sometimes since we're getting the text out of all the tags, these get mixed in and give a lot of bad data
     for script_tags in soup.select('script'): 
         script_tags.extract()
     for style_tags in soup.select('style'): 
@@ -145,7 +152,11 @@ def get_jorb(url):
 
     if domain in jobsite_container_class.keys():
         elements = soup.find_all("div", class_ = jobsite_container_class[domain]) #need to find
-        text = elements[0].get_text(separator=' ') #get text but add spaces around elements
+        try:
+            text = elements[0].get_text(separator=' ') #get text but add spaces around elements
+        except IndexError:
+            text = soup.get_text(separator=' ')
+        
     else:
         print(f"NOTE: did not recognize jobsite {domain}, consider adding to get_jorb function")
         text = soup.get_text(separator=' ')
@@ -165,7 +176,12 @@ def gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key):
     prompt = f"{gpt_base_prompt}{job_description}" #build our prompt
 
     openai.api_key = open_ai_key
-    completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
+
+    try:
+        completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
+    except:
+        return False
+    
     reply = completion.choices[0].message.content #just get the reply message which is what we care about
    
     return reply
@@ -182,11 +198,13 @@ def split_gpt(read_job,job_link):
 
     read_job.reverse()
 
+    read_job = [s.strip() for s in read_job] #strip lealding/trailing whitespace
+
     return read_job
 
 
-def write_jorb_csv_log(output):
-    with open('collected_jorbs.csv', 'a') as f_object: #write the output as a csv
+def write_jorb_csv_log(output,timestamp):
+    with open(f"collected_jorbs_{timestamp}.csv", 'a') as f_object: #write the output as a csv
         writer_object = writer(f_object)
         writer_object.writerow(output)
         f_object.close()
