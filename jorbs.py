@@ -43,13 +43,13 @@ for aggregator in aggregators_rss:
                     if read_job:
                         final_job_output = split_gpt(read_job,job_link)
 
-                        final_job_output_screen = final_job_output #drop the link and the time off the screen output
-                        del final_job_output_screen[0]
-                        del final_job_output_screen[0]
-
-                        print(f"      job data: {final_job_output_screen}")
-
                         write_jorb_csv_log(final_job_output,timestamp)
+
+                        #drop the link and the time off the screen output
+                        del final_job_output[0]
+                        del final_job_output[0]
+
+                        print(f"      data: {final_job_output}")
                     else:
                         print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
                 else:
