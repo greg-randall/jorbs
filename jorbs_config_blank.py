@@ -18,14 +18,16 @@ search_keywords = [
 
 
 gpt_base_prompt = '''\
-    Please read the job description below.
+Please read the job description below.
 
-    Determine if the job is related web development, answer TRUE or FALSE.
-    Output a linebreak.
-    Find pay information, reply with a dollar amount otherwise answer FALSE.
-    Output a linebreak.
-    Determine if the location of the job, answer in the form of CITY, STATE, if the answer isn't in the form of 'CITY, STATE' answer FALSE.
-
+Determine if the job is related web development, answer TRUE or FALSE.
+Output a linebreak.
+Find pay information, reply with a dollar amount otherwise answer FALSE.
+Output a linebreak.
+Determine if the location of the job, answer in the form of CITY, STATE, if the answer isn't in the form of 'CITY, STATE' answer FALSE.
+Summarize the job in a few sentences.
+Output a linebreak.
+Summarize the job requimrements in a few sentences.
     
-    Job Description:
-    '''
+Job Description:
+'''
