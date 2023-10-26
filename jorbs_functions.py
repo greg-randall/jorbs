@@ -77,8 +77,8 @@ def write_log_item(path,aggregator,keyword,timestamp,feed_raw):
     if not os.path.exists(path):#make feed log folder if it doesn't exist
         os.mkdir(path) 
 
-    if not os.path.exists(f"{path}/{timestamp}"):#make feed log subfolder folder if it doesn't exist
-        os.mkdir(f"{path}/{timestamp}") 
+    if not os.path.exists(f"{path}"):#make feed log subfolder folder if it doesn't exist
+        os.mkdir(f"{path}") 
 
     domain = tldextract.extract(aggregator) #get domain by itself for feed logging filenames
     domain = domain.domain
@@ -88,7 +88,7 @@ def write_log_item(path,aggregator,keyword,timestamp,feed_raw):
     keyword_clean = re.sub('[^a-zA-Z_-]','_', keyword_clean)
 
 
-    f = open(f"{path}/{timestamp}/{domain}_k-{keyword_clean}_t-{int(time.time())}_uuid-{uuid.uuid4().hex}.txt", "w") #write out the raw feed for reference
+    f = open(f"{path}/{domain}_k-{keyword_clean}_t-{int(time.time())}_uuid-{uuid.uuid4().hex}.txt", "w") #write out the raw feed for reference
     f.write(feed_raw)
     f.close()
 
@@ -213,7 +213,7 @@ def split_gpt(read_job,job_link):
 
 
 def write_jorb_csv_log(output,timestamp):
-    with open(f"collected_jorbs_{timestamp}.csv", 'a') as f_object: #write the output as a csv
+    with open(f"jorb_run_{timestamp}/collected_jorbs_{timestamp}.csv", 'a') as f_object: #write the output as a csv
         writer_object = writer(f_object)
         writer_object.writerow(output)
         f_object.close()
