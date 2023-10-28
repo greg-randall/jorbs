@@ -1,5 +1,6 @@
 import asyncio
 from bs4 import BeautifulSoup
+from collections import OrderedDict
 from csv import writer
 import datetime
 import html
@@ -11,7 +12,7 @@ import re
 import time
 import tldextract
 import uuid
-
+import json
 
 
 # download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
@@ -182,38 +183,96 @@ def get_jorb(url):
     return text
 
 
-#get chatgpt to parse our job
-def gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key):
-    openai.api_key = open_ai_key
-
-    prompt = f"{gpt_base_prompt}{job_description}" #build our prompt
-    
-    try:
-        completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
-    except:
-        return False
-    
-    reply = completion.choices[0].message.content #just get the reply message which is what we care about
-    return reply
-
-def split_gpt(read_job,job_link):
-    read_job = read_job.splitlines() #split the chat output by linebreaks
-
-    read_job.reverse() #this is probably showing my python inexpereince, but fipping to prepend data
-    read_job.append(job_link)
-
-    d_date = datetime.datetime.now()
-    read_job.append(d_date.strftime("%m-%d-%Y %I:%M%p"))
-
-    read_job.reverse()
-
-    read_job = [s.strip() for s in read_job] #strip lealding/trailing whitespace
-
-    return read_job
-
-
 def write_jorb_csv_log(output,timestamp):
     with open(f"jorb_run_{timestamp}/collected_jorbs_{timestamp}.csv", 'a') as f_object: #write the output as a csv
         writer_object = writer(f_object)
-        writer_object.writerow(output)
+        writer_object.writerow(output.values())
         f_object.close()
+
+
+
+#reference https://blog.daniemon.com/2023/06/15/chatgpt-function-calling/
+def gpt_jorb(jorb,open_ai_key):
+    functions = [
+        {
+            'name': 'get_job_information',
+            'description': 'Get information from a job description including job title, job summary, job requirements, if the job is bookarts related, if the job is full time.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'job-title': {
+                        'type': 'string',
+                        'description': 'Job title',
+                    },
+                    'summary': {
+                        'type': 'string',
+                        'description': 'Two sentence job summary',
+                    },
+                    'requirements': {
+                        'type': 'string',
+                        'description': 'Two sentence job requirements',
+                    },
+                    'bookarts-related': {
+                        'type': 'string',
+                        'enum': [
+                            'TRUE',
+                            'FALSE',
+                        ],
+                    },
+                    'full-time-job': {
+                        'type': 'string',
+                        'enum': [
+                            'TRUE',
+                            'FALSE',
+                        ],
+                    },
+                    'pay-information': {
+                        'type': 'integer',
+                        'description': 'Pay information for the job'
+                    },
+                },
+                'required': [
+                    'job-title',
+                    'summary',
+                    'requirements',
+                    'bookarts-related',
+                    'full-time-job',
+                    'pay-information'
+                ],
+            },
+        },
+    ]
+
+    try:
+        openai.api_key = open_ai_key
+        response = openai.ChatCompletion.create(
+            model = "gpt-3.5-turbo-0613",
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert at reading job descriptions, and determing the kind of job, job requirements, job salary, job location, and other job information."
+                },
+                {
+                    "role": "user",
+                    "content": jorb
+                }
+            ],
+            functions = functions,
+            function_call = {
+                "name": functions[0]["name"]
+            }
+        )
+
+
+        arguments = response["choices"][0]["message"]["function_call"]["arguments"]
+        #print(type(arguments))
+        arguments = json.loads(arguments)
+        arguments = OrderedDict(sorted(arguments.items()))
+
+        for key in functions[0]['parameters']['required']: #make sure that if chatgpt fails to return a value we add it in so the output csv or whatever isn't a mess
+            if not key in arguments:
+                arguments[key] = "null"
+
+        return arguments
+    except:
+        return False

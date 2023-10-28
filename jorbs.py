@@ -42,18 +42,19 @@ for aggregator in aggregators_rss:
 
                     write_log_item(f"jorb_run_{timestamp}/job_listings",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
 
-                    read_job = gpt_jorb_parse(gpt_base_prompt,job_description,open_ai_key)
+                    read_job = gpt_jorb(job_description,open_ai_key)
 
                     if read_job:
-                        final_job_output = split_gpt(read_job,job_link)
 
-                        write_jorb_csv_log(final_job_output,timestamp)
+                        print(f"      data: {read_job}")
 
-                        #drop the link and the time off the screen output
-                        del final_job_output[0]
-                        del final_job_output[0]
+                        d_date = datetime.datetime.now()
 
-                        print(f"      data: {final_job_output}")
+                        read_job['date_time'] = d_date.strftime("%m-%d-%Y %I:%M%p")
+                        read_job['job_link'] = job_link
+
+                        write_jorb_csv_log(read_job,timestamp)
+                       
                     else:
                         print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
                 else:
