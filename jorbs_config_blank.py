@@ -16,18 +16,60 @@ search_keywords = [
     'fullstack',
     ]
 
+#so this is a new way of doing chatgpt prompts to get structured information out.
+#below you see several items under 'properties' for example:
+#   'summary': {
+#        'type': 'string',
+#        'description': 'Two sentence job summary',
+#this defines something that you want in your output, 
+# #you need to name the part, 'summary' here, 
+# type will typically be 'string', 
+# and then under description breifly say what the variable should contain
+#
+#below you'll notice we have several types, there's a true or false for 'full-time-job' and
+#an integer for pay information
 
-gpt_base_prompt = '''\
-Please read the job description below.
+#please note as you add and remove items under 'properties', you should add the items's name under 'required' at the very bottom
 
-Determine if the job is related web development, answer TRUE or FALSE.
-Output a linebreak.
-Find pay information, reply with a dollar amount otherwise answer FALSE.
-Output a linebreak.
-Determine if the location of the job, answer in the form of CITY, STATE, if the answer isn't in the form of 'CITY, STATE' answer FALSE.
-Summarize the job in a few sentences.
-Output a linebreak.
-Summarize the job requimrements in a few sentences.
-    
-Job Description:
-'''
+functions = [
+    {
+        'name': 'get_job_information',
+        'description': 'Get information from a job description including job title, job summary, job requirements, if the job is bookarts related, if the job is full time.',
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'job-title': {
+                    'type': 'string',
+                    'description': 'Job title',
+                },
+                'summary': {
+                    'type': 'string',
+                    'description': 'Two sentence job summary',
+                },
+                'requirements': {
+                    'type': 'string',
+                    'description': 'Two sentence job requirements',
+                },
+                'full-time-job': {
+                    'type': 'string',
+                    'description': 'Is the job full-time?',
+                    'enum': [
+                        'TRUE',
+                        'FALSE',
+                    ],
+                },
+                'pay-information': {
+                    'type': 'integer',
+                    'description': 'Pay information for the job'
+                },
+            },
+            'required': [
+                'job-title',
+                'summary',
+                'requirements',
+                'full-time-job',
+                'pay-information'
+            ],
+        },
+    },
+]

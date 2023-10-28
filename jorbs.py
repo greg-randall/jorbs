@@ -42,7 +42,7 @@ for aggregator in aggregators_rss:
 
                     write_log_item(f"jorb_run_{timestamp}/job_listings",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
 
-                    read_job = gpt_jorb(job_description,open_ai_key)
+                    read_job = gpt_jorb(job_description,open_ai_key,functions)
 
                     if read_job:
 

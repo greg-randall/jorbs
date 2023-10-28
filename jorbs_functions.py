@@ -192,56 +192,8 @@ def write_jorb_csv_log(output,timestamp):
 
 
 #reference https://blog.daniemon.com/2023/06/15/chatgpt-function-calling/
-def gpt_jorb(jorb,open_ai_key):
-    functions = [
-        {
-            'name': 'get_job_information',
-            'description': 'Get information from a job description including job title, job summary, job requirements, if the job is bookarts related, if the job is full time.',
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    'job-title': {
-                        'type': 'string',
-                        'description': 'Job title',
-                    },
-                    'summary': {
-                        'type': 'string',
-                        'description': 'Two sentence job summary',
-                    },
-                    'requirements': {
-                        'type': 'string',
-                        'description': 'Two sentence job requirements',
-                    },
-                    'bookarts-related': {
-                        'type': 'string',
-                        'enum': [
-                            'TRUE',
-                            'FALSE',
-                        ],
-                    },
-                    'full-time-job': {
-                        'type': 'string',
-                        'enum': [
-                            'TRUE',
-                            'FALSE',
-                        ],
-                    },
-                    'pay-information': {
-                        'type': 'integer',
-                        'description': 'Pay information for the job'
-                    },
-                },
-                'required': [
-                    'job-title',
-                    'summary',
-                    'requirements',
-                    'bookarts-related',
-                    'full-time-job',
-                    'pay-information'
-                ],
-            },
-        },
-    ]
+def gpt_jorb(jorb,open_ai_key,functions):
+
 
     try:
         openai.api_key = open_ai_key
