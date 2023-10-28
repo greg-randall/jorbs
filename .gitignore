@@ -1,6 +1,6 @@
 jorbs_config.py
 jorbs_feeds/*
-test.py
+test*
 __pycache__/*
  jorbs_jobs/*
 *.txt
