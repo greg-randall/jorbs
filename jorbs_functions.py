@@ -271,9 +271,12 @@ def gpt_jorb(jorb,open_ai_key,functions,field_name,relevance):
 
 #text message function
 def send_text(phone,message,api_key):
-    resp = requests.post('https://textbelt.com/text', {
-    'phone': phone,
-    'message': message,
-    'key': api_key,
-    })
-    #print(resp.json())
+    try:
+        resp = requests.post('https://textbelt.com/text', {
+        'phone': phone,
+        'message': message,
+        'key': api_key,
+        })
+        return True
+    except:
+        return False

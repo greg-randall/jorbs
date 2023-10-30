@@ -87,9 +87,10 @@ for aggregator in aggregators_rss:
 
                             if text_or_not == "true": #if string is true send a text:
                                 message = f"{read_job['1_date_time']}\nPossible New Job: {read_job['job-title']}\n{read_job['2_job_link']}"
-                                send_text(phone_number,message,textbelt_key)
 
-                        
+                                if not send_text(phone_number,message,textbelt_key):
+                                    print ("ERROR: something went wrong when we tried to send a text, check your textbelt API key and your phone number")
+
                         else:
                             print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
                     else:
