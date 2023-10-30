@@ -1,5 +1,5 @@
 # jorbs
-In sort this tool collect jobs from several job aggregators on RSS using keywords and then use ChatGPT to collect information about the job.
+This tool collect jobs from several job aggregators via RSS using keywords and then uses ChatGPT to collect information about the jobs and determine if they're relevant to your job search.
 
 To get things running, clone the repo, duplicate the 'jorbs_config_blank.py' file and rename it to 'jorbs_config.py'. There are instructions about what to change in the config file to search for your desired job.
 
