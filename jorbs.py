@@ -84,8 +84,6 @@ for aggregator in aggregators_rss:
 
                             #determining if we're going to text ourselves about a new job
                             text_or_not = read_job[relevance_field_name].lower() #make the string lowercase for comparison
-                            text_or_not = re.sub(r'\s.+', '', text_or_not) #seems like mostly when chatgpt does something weird here, it explains why it's true or false, we'll just drop everything after a space (ie "FALSE. This job is not..." to "FALSE.")
-                            text_or_not = re.sub(r'[^a-z]', '', text_or_not) #drop all non alpha from string 
 
                             if text_or_not == "true": #if string is true send a text:
                                 message = f"{read_job['1_date_time']}\nPossible New Job: {read_job['job-title']}\n{read_job['2_job_link']}"

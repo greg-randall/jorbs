@@ -255,7 +255,8 @@ def gpt_jorb(jorb,open_ai_key,functions,field_name,relevance):
             reply = completion.choices[0].message.content #just get the reply message which is what we care about
 
             reply = re.sub("\n", ' ', reply) #remove linebreaks
-            reply = re.sub("\s+", ' ', reply) #remove doubled spaces
+            reply = re.sub(r'\s.+', '', reply) #seems like mostly when chatgpt does something weird here, it explains why it's true or false, we'll just drop everything after a space (ie "FALSE. This job is not..." to "FALSE.")
+            reply = re.sub(r'[^a-zA-Z]', '', reply) #drop all non alpha from string
 
             arguments[field_name]=reply
 
