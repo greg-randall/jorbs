@@ -31,7 +31,7 @@ search_keywords = [
     'letterpress',
     '"book arts"',
     '"artist books"',
-    '"artist\'s books"'
+    '"artist\'s books"',
     '"book binding"',
     'bookbinding',
     '"book conservation"',
