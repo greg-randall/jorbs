@@ -26,7 +26,6 @@ else:
     already_processed_jobs = [] #if the file doesn't exist, we'll just make a blank file
 
 
-
 job_links_skip = [] #we're going to skip links that have already been processed, during this run
 
 
@@ -60,15 +59,14 @@ for aggregator in aggregators_rss:
 
                         write_log_item(f"jorb_run_{timestamp}/job_listings",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
 
-                        read_job = gpt_jorb(job_description,open_ai_key,functions)
+                        read_job = gpt_jorb(job_description,open_ai_key,functions,relevance_field_name,relevance)
 
                         if read_job:
 
                             print(f"      data: {read_job}")
 
                             #add datetime and the link to our job info for output
-                            d_date = datetime.datetime.now()
-                            read_job['1_date_time'] = d_date.strftime("%m-%d-%Y %I:%M%p")
+                            read_job['1_date_time'] = time.strftime("%m-%d-%Y %I:%M%p")
                             read_job['2_job_link'] = job_link
 
 
@@ -84,10 +82,14 @@ for aggregator in aggregators_rss:
 
                             job_links_skip.append(job_link) #append the url of the job we just parsed to an array, so if it comes up in this run again, we skip it
 
+                            #determining if we're going to text ourselves about a new job
+                            text_or_not = read_job[relevance_field_name].lower() #make the string lowercase for comparison
+                            text_or_not = re.sub(r'\s.+', '', text_or_not) #seems like mostly when chatgpt does something weird here, it explains why it's true or false, we'll just drop everything after a space (ie "FALSE. This job is not..." to "FALSE.")
+                            text_or_not = re.sub(r'[^a-z]', '', text_or_not) #drop all non alpha from string 
 
-                            #insert logic for text message 
-                            #if read_job['bookarts-related'].lower() == "true":
-                            #    send_text(phone,message,api_key)
+                            if text_or_not == "true": #if string is true send a text:
+                                message = f"{read_job['1_date_time']}\nPossible New Job: {read_job['job-title']}\n{read_job['2_job_link']}"
+                                send_text(phone_number,message,textbelt_key)
 
                         
                         else:
