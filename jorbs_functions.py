@@ -9,6 +9,7 @@ import os
 from pyppeteer import launch
 from pyppeteer_stealth import stealth
 import re
+import requests
 import time
 import tldextract
 import uuid
@@ -184,11 +185,29 @@ def get_jorb(url):
 
 
 def write_jorb_csv_log(output,timestamp):
-    with open(f"jorb_run_{timestamp}/collected_jorbs_{timestamp}.csv", 'a') as f_object: #write the output as a csv
+    filename = f"jorb_run_{timestamp}/collected_jorbs_{timestamp}.csv"
+    if not os.path.exists(filename):#make feed log folder if it doesn't exist
+        header = list(output.keys())
+
+        header.sort()
+
+        header.remove('1_date_time')
+        header.remove('2_job_link')
+
+        header = ['job_link'] + header
+        header = ['date_time'] + header
+    
+        
+        with open(filename, 'a') as f_object: #write the output as a csv
+            writer_object = writer(f_object)
+            writer_object.writerow(header)
+            f_object.close()
+
+
+    with open(filename, 'a') as f_object: #write the output as a csv
         writer_object = writer(f_object)
         writer_object.writerow(output.values())
         f_object.close()
-
 
 
 #reference https://blog.daniemon.com/2023/06/15/chatgpt-function-calling/
@@ -198,7 +217,8 @@ def gpt_jorb(jorb,open_ai_key,functions):
     try:
         openai.api_key = open_ai_key
         response = openai.ChatCompletion.create(
-            model = "gpt-3.5-turbo-0613",
+            #model = "gpt-3.5-turbo-0613",
+            model = "gpt-4-0613",
             messages = [
                 {
                     "role": "system",
@@ -215,16 +235,50 @@ def gpt_jorb(jorb,open_ai_key,functions):
             }
         )
 
+        #print(f"debug:\n{response}")
 
         arguments = response["choices"][0]["message"]["function_call"]["arguments"]
+
+
+        arguments = re.sub("\n", ' ', arguments) #remove linebreaks inside the json fields,
+        arguments = re.sub("\s+", ' ', arguments) #remove doubled spaces in the json
+        
+
         #print(type(arguments))
         arguments = json.loads(arguments)
-        arguments = OrderedDict(sorted(arguments.items()))
+        
 
         for key in functions[0]['parameters']['required']: #make sure that if chatgpt fails to return a value we add it in so the output csv or whatever isn't a mess
             if not key in arguments:
                 arguments[key] = "null"
+        
+        
+
+        try:
+            prompt = f"Read the job description and job requiremtns below and determine if this job is related to bookarts, letterpress or bookbinding. Reply with TRUE or FALSE\n\nJob Description:\n{arguments['summary']}\n\nJob Requirements:\n{arguments['requirements']}" #build our prompt
+
+            openai.api_key = open_ai_key
+            completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
+            reply = completion.choices[0].message.content #just get the reply message which is what we care about
+
+            reply = re.sub("\n", ' ', reply) #remove linebreaks
+            reply = re.sub("\s+", ' ', reply) #remove doubled spaces
+
+            arguments['bookarts']=reply
+
+        except:
+            return False
+
+        arguments = OrderedDict(sorted(arguments.items()))
 
         return arguments
     except:
         return False
+
+def send_text(phone,message,api_key):
+    resp = requests.post('https://textbelt.com/text', {
+    'phone': phone,
+    'message': message,
+    'key': api_key,
+    })
+    print(resp.json())

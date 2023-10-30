@@ -1,5 +1,9 @@
 open_ai_key = "....."
 
+textbelt_key = "....."
+
+phone_number = "....."
+
 #aggregators, format so that the keyword part is at the end
 aggregators_rss = [
     "https://careers.insidehighered.com/jobsrss/?countrycode=US&keywords=",

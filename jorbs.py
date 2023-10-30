@@ -6,7 +6,7 @@ import os
 from jorbs_config import * #make sure to copy and rename 'jorbs_config_blank.py' to  'jorbs_config.py'
 from jorbs_functions import *
 
-#randomize list order
+#randomize list order, so if we are getting rate limited or something on one of the sites, the keywords happen in different orders
 random.shuffle(aggregators_rss)
 random.shuffle(search_keywords)
 
@@ -15,7 +15,21 @@ timestamp = int(time.time()) #have a conistent timestamp for all of the logging 
 if not os.path.exists(f"jorb_run_{timestamp}"):#make feed log subfolder folder if it doesn't exist
     os.mkdir(f"jorb_run_{timestamp}") 
 
-aggregators_rss_url = []
+
+#read in the list of previous checked urls, so we don't process them again:
+if os.path.exists("already_parsed_jobs.txt"):
+    my_file = open("already_parsed_jobs.txt", "r") 
+    data = my_file.read() 
+    already_processed_jobs = data.split("\n") 
+    my_file.close()
+else:
+    already_processed_jobs = [] #if the file doesn't exist, we'll just make a blank file
+
+
+
+job_links_skip = [] #we're going to skip links that have already been processed, during this run
+
+
 for aggregator in aggregators_rss:
     print(f"feed: {aggregator}")
     for keyword in search_keywords:
@@ -37,27 +51,48 @@ for aggregator in aggregators_rss:
 
                 print(f"    job: {job_link}")
 
-                job_description = get_jorb( job_link ) #collect the page with the job description
-                if job_description:
 
-                    write_log_item(f"jorb_run_{timestamp}/job_listings",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
-
-                    read_job = gpt_jorb(job_description,open_ai_key,functions)
-
-                    if read_job:
-
-                        print(f"      data: {read_job}")
-
-                        d_date = datetime.datetime.now()
-
-                        read_job['date_time'] = d_date.strftime("%m-%d-%Y %I:%M%p")
-                        read_job['job_link'] = job_link
-
-                        write_jorb_csv_log(read_job,timestamp)
-                       
-                    else:
-                        print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
+                if job_link in already_processed_jobs or job_link in job_links_skip: #check to see if the job link we're looking at has been processed in this or a previous run
+                    print(f"      job processed previously")
                 else:
-                    print ("ERROR: something happened with the above job in when we tried to get the job description")
+                    job_description = get_jorb( job_link ) #collect the page with the job description
+                    if job_description:
+
+                        write_log_item(f"jorb_run_{timestamp}/job_listings",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
+
+                        read_job = gpt_jorb(job_description,open_ai_key,functions)
+
+                        if read_job:
+
+                            print(f"      data: {read_job}")
+
+                            #add datetime and the link to our job info for output
+                            d_date = datetime.datetime.now()
+                            read_job['1_date_time'] = d_date.strftime("%m-%d-%Y %I:%M%p")
+                            read_job['2_job_link'] = job_link
+
+
+                            read_job = OrderedDict(sorted(read_job.items()))#sort the output
+
+
+                            write_jorb_csv_log(read_job,timestamp)
+
+                            
+                            file1 = open("already_parsed_jobs.txt", "a")  #output the url of the job we just parsed, so we don't do it again in future runs
+                            file1.write(f"{job_link}\n")
+                            file1.close()
+
+                            job_links_skip.append(job_link) #append the url of the job we just parsed to an array, so if it comes up in this run again, we skip it
+
+
+                            #insert logic for text message 
+                            #if read_job['bookarts-related'].lower() == "true":
+                            #    send_text(phone,message,api_key)
+
+                        
+                        else:
+                            print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
+                    else:
+                        print ("ERROR: something happened with the above job in when we tried to get the job description")                    
         else:
             print ("ERROR: something happened with the above rss feed when we tried to download it")
