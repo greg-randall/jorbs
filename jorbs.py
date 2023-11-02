@@ -28,6 +28,7 @@ else:
 
 job_links_skip = [] #we're going to skip links that have already been processed, during this run
 
+text_sent = False #we'll check to see if any texts were sent, if none were we'll send one letting us know that the scan ran
 
 for aggregator in aggregators_rss:
     print(f"feed: {aggregator}")
@@ -90,6 +91,8 @@ for aggregator in aggregators_rss:
 
                                 if not send_text(phone_number,message,textbelt_key):
                                     print ("ERROR: something went wrong when we tried to send a text, check your textbelt API key and your phone number")
+                                
+                                text_sent = True
 
                         else:
                             print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
@@ -97,3 +100,8 @@ for aggregator in aggregators_rss:
                         print ("ERROR: something happened with the above job in when we tried to get the job description")                    
         else:
             print ("ERROR: something happened with the above rss feed when we tried to download it")
+
+if not text_sent:
+    message = f"{time.strftime('%m-%d-%Y %I:%M%p')}\nJob scan ran, but nothing to report"
+
+    send_text(phone_number,message,textbelt_key)

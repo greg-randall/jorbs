@@ -13,6 +13,7 @@ import time
 import tldextract
 import uuid
 import json
+import pyppeteer.errors
 
 
 # download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
@@ -248,7 +249,7 @@ def gpt_jorb(jorb,open_ai_key,functions,field_name,relevance):
 
         #we're going to do a followup question for chatgpt to try and figure out if the job is actually relevant to our interests
         try:
-            prompt = f"{relevance}\n\nJob Description:\n{arguments['summary']}\n\nJob Requirements:\n{arguments['requirements']}" #build our prompt
+            prompt = f"{relevance}\n\nJob Title:\n{arguments['job-title']}\n\nJob Description:\n{arguments['summary']}\n\nJob Requirements:\n{arguments['requirements']}" #build our prompt
 
             openai.api_key = open_ai_key
             completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
