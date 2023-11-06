@@ -88,8 +88,8 @@ for keyword in search_keywords:
                             for key, value in read_job.items():
                                 # Convert value to string
                                 value = str(value)
-                                wrapped_value = textwrap.fill(value, width=80, subsequent_indent='          ',initial_indent='          ')
-                                cprint(f"          {key}:\n  {wrapped_value}","green")
+                                wrapped_value = textwrap.fill(value, width=80, subsequent_indent='            ',initial_indent='            ')
+                                cprint(f"          {key}:\n{wrapped_value}","green")
 
                             #add datetime and the link to our job info for output
                             read_job['1_date_time'] = time.strftime("%m-%d-%Y %I:%M%p")
