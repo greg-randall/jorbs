@@ -293,7 +293,7 @@ def get_linkedin_search(url):
         
         click_failed = 0
 
-        scrolls = 350
+        scrolls = 1000
         for i in range(scrolls): #i had a while true here, but it's better if it fails eventually
             #wait for the loader to disappear
             #print(f"i:{i}")
@@ -373,4 +373,4 @@ def get_domain(url):
     return domain
 
 def rand_sleep():
-    return random.uniform(0.1, 0.3)
+    return random.uniform(0.01, 0.1)
