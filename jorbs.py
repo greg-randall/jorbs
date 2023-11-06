@@ -1,20 +1,17 @@
+import os
+import random
+from termcolor import cprint
+import textwrap
 import time
 import urllib
-import random
-import os
 
 from jorbs_config import * #make sure to copy and rename 'jorbs_config_blank.py' to  'jorbs_config.py'
 from jorbs_functions import *
 
-#randomize list order, so if we are getting rate limited or something on one of the sites, the keywords happen in different orders
-random.shuffle(aggregators_rss)
+#randomize list order, breaks the pattern up of us searching the websites 
 random.shuffle(search_keywords)
 
 timestamp = int(time.time()) #have a conistent timestamp for all of the logging from the start of the run
-
-if not os.path.exists(f"jorb_run_{timestamp}"):#make feed log subfolder folder if it doesn't exist
-    os.mkdir(f"jorb_run_{timestamp}") 
-
 
 #read in the list of previous checked urls, so we don't process them again:
 if os.path.exists("already_parsed_jobs.txt"):
@@ -22,6 +19,7 @@ if os.path.exists("already_parsed_jobs.txt"):
     data = my_file.read() 
     already_processed_jobs = data.split("\n") 
     my_file.close()
+    #print(f"already processed jobs: {len(already_processed_jobs)}\n\n")
 else:
     already_processed_jobs = [] #if the file doesn't exist, we'll just make a blank file
 
@@ -30,78 +28,107 @@ job_links_skip = [] #we're going to skip links that have already been processed,
 
 text_sent = False #we'll check to see if any texts were sent, if none were we'll send one letting us know that the scan ran
 
-for aggregator in aggregators_rss:
-    print(f"feed: {aggregator}")
-    for keyword in search_keywords:
-        print(f"  keyword: {keyword}")
-
-        keyword_encded = urllib.parse.quote_plus(keyword) #urlencode the search string -- ie spaces turn to %20, quotes to %22.
+for keyword in search_keywords:
+    cprint(f"keyword: {keyword}", "red")
+    random.shuffle(aggregators_rss) #randomize the order of the aggregators, so we don't hit the same one first every time
+    for aggregator in aggregators_rss:
         
-        url = f"{aggregator}{keyword_encded}" #build the url for collection 
+        domain = get_domain(aggregator)
 
-        feed_raw = get_feed(url)
+        if not domain == "linkedin": #linkedin is handled differently,
+            #urlencode the search string -- ie spaces turn to %20, quotes to %22.
+            url = f"{aggregator}{urllib.parse.quote_plus(keyword)}" #build the url for collection 
+        else:
+            linked_in_keyword = keyword.replace('"', '')
+            linked_in_keyword =urllib.parse.quote_plus(linked_in_keyword)
+            url = f"{aggregator}{linked_in_keyword}" #build the url for collection 
+        
+        cprint(f"  {url}", "yellow")
 
-        if feed_raw:
-            
-            write_log_item(f"jorb_run_{timestamp}/feeds",aggregator,keyword,timestamp,feed_raw) #logging the feeds for later troubleshooting
+        if not domain == "linkedin": #linkedin is handled differently,
+            feed_raw = get_feed(url)
+            job_links = get_links_from_feed(feed_raw)
+        else:
+            job_links = get_linkedin_search(url)
 
-            job_links = get_links_from_feed(feed_raw) #get the links from the feed
-
+        no_jobs_found = 0
+        if isinstance(job_links, list): #make sure the item is a list
+            skipped_jobs=0
+            not_skipped_jobs=0
+            keyword_not_found = 0
             for job_link in job_links:
-
-                print(f"    job: {job_link}")
-
-
-                if job_link in already_processed_jobs or job_link in job_links_skip: #check to see if the job link we're looking at has been processed in this or a previous run
-                    print(f"      job processed previously")
-                else:
+                if not job_link in already_processed_jobs and not job_link in job_links_skip: #check to see if the job link we're looking at has been processed in this or a previous run
                     job_description = get_jorb( job_link ) #collect the page with the job description
-                    if job_description:
+                    if job_description:        
 
-                        write_log_item(f"jorb_run_{timestamp}/job_listings",job_link,keyword,timestamp,job_description)  #logging the description for later troubleshooting
+                        #we're going to make sure that at least one of our keywords is in the job description, if not we'll skip the job description
+                        keyword_found = False
+                        for search_keyword in search_keywords:
+                            keyword_no_quotes = search_keyword.replace('"', '')
+                            if keyword_no_quotes.lower() in job_description.lower():
+                                keyword_found = True
+                                break
 
-                        read_job = gpt_jorb(job_description,open_ai_key,functions,relevance_field_name,relevance)
+                        if keyword_found:
+                            cprint(f"      job: {job_link}","green")
+                            cprint(f"        {search_keyword} found in job description, starting gpt","green") #if we do find the keyword, we'll fire up chatgpt
+                            read_job = gpt_jorb(job_description,open_ai_key,functions,relevance_field_name,relevance)
+                        else: #if we don't find the keyword, we'll skip the job, and write it out to our already processed jobs file and our skip list
+                            print(f"    job: {job_link}")
+                            print(f"      none of the keywords were found in the job description")
+                            read_job = False
 
+                            file1 = open("already_parsed_jobs.txt", "a")  #output the url of the job so we don't do it again in future runs
+                            file1.write(f"{job_link}\n")
+                            file1.close()
+
+                            job_links_skip.append(job_link) #append the url of the job, so if it comes up in this run again, we skip it
+                        
                         if read_job:
-
-                            print(f"      data: {read_job}")
+                            for key, value in read_job.items():
+                                # Convert value to string
+                                value = str(value)
+                                wrapped_value = textwrap.fill(value, width=80, subsequent_indent='          ',initial_indent='          ')
+                                cprint(f"          {key}:\n  {wrapped_value}","green")
 
                             #add datetime and the link to our job info for output
                             read_job['1_date_time'] = time.strftime("%m-%d-%Y %I:%M%p")
                             read_job['2_job_link'] = job_link
 
-
                             read_job = OrderedDict(sorted(read_job.items()))#sort the output
-
 
                             write_jorb_csv_log(read_job,timestamp)
 
-                            
                             file1 = open("already_parsed_jobs.txt", "a")  #output the url of the job we just parsed, so we don't do it again in future runs
                             file1.write(f"{job_link}\n")
                             file1.close()
 
                             job_links_skip.append(job_link) #append the url of the job we just parsed to an array, so if it comes up in this run again, we skip it
 
-                            #determining if we're going to text ourselves about a new job
-                            text_or_not = read_job[relevance_field_name].lower() #make the string lowercase for comparison
-
-                            if text_or_not == "true": #if string is true send a text:
+                            if text_me_if(read_job):
                                 message = f"{read_job['1_date_time']}\nPossible New Job: {read_job['job-title']}\n{read_job['2_job_link']}"
-
                                 if not send_text(phone_number,message,textbelt_key):
-                                    print ("ERROR: something went wrong when we tried to send a text, check your textbelt API key and your phone number")
-                                
-                                text_sent = True
+                                    cprint ("ERROR: something went wrong when we tried to send a text, check your textbelt API key and your phone number", "magenta")
 
+                        elif not keyword_found:
+                            keyword_not_found += 1
                         else:
-                            print ("ERROR: something happened with the above job when we asked chatgpt to parse the info")
+                            cprint ("ERROR: something happened with the above job when we asked chatgpt to parse the info", "magenta")
                     else:
-                        print ("ERROR: something happened with the above job in when we tried to get the job description")                    
+                        cprint ("ERROR: something happened with the above job in when we tried to get the job description", "magenta")      
+                else:
+                    skipped_jobs+=1
+            if skipped_jobs > 0:
+                print(f"      Skipped  {skipped_jobs} jobs that we had already seen.")
+            else:
+                not_skipped_jobs+=1
+                #print(f"      No jobs skipped.")
+        elif job_links == 0:
+            #print ("      No jobs found")
+            no_jobs_found += 1
         else:
-            print ("ERROR: something happened with the above rss feed when we tried to download it")
-
+           cprint ("ERROR: something happened with the above rss feed when we tried to download it", "magenta")
 if not text_sent:
     message = f"{time.strftime('%m-%d-%Y %I:%M%p')}\nJob scan ran, but nothing to report"
-
-    send_text(phone_number,message,textbelt_key)
+    if not send_text(phone_number,message,textbelt_key):
+        cprint ("ERROR: something went wrong when we tried to send a text, check your textbelt API key and your phone number", "magenta")

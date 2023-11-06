@@ -3,17 +3,18 @@ from bs4 import BeautifulSoup
 from collections import OrderedDict
 from csv import writer
 import html
+import json
 import openai
 import os
 from pyppeteer import launch
+from pyppeteer.errors import PyppeteerError
 from pyppeteer_stealth import stealth
+import random
 import re
 import requests
+from termcolor import cprint
 import time
 import tldextract
-import uuid
-import json
-import pyppeteer.errors
 
 
 # download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
@@ -21,13 +22,10 @@ def get_feed(url):
     async def get_feed_raw(): #startin up the pyppeteer
         browser = await launch()
         page = await browser.newPage()
-
         await stealth(page) #lookin at you indeed
-
         await page.goto(url)
         feed_raw = await page.content()
         await browser.close()
-
         return feed_raw
 
     try:
@@ -44,15 +42,16 @@ def get_feed(url):
 def get_links_from_feed(feed_raw): 
     raw_links = re.findall('<link>h[^<]*</link>', feed_raw) #using regex for the feed link collection. feeds are that come out of pyppeteer are malformed since chrome formats them
 
+    feed_domain_raw = re.sub('<[^<]+?>', '',raw_links[0])
+    feed_domain = get_domain (feed_domain_raw)
+
     output_links = []
     output_links_clean = []
-
     if len(raw_links)>1: #make sure we actually got some links
 
         for link in raw_links:
             link = re.sub('</?link>','', link) #remove the link tag from around the link
             link = html.unescape(link) #xml requires that ampersands be escaped, fixing that for our links
-            
             output_links.append(link) #add the clean link to our output 
 
         output_links.pop(0) #first link in an rss feed is a link to the site associated with the feed https://www.rssboard.org/rss-draft-1#element-channel-link
@@ -63,38 +62,24 @@ def get_links_from_feed(feed_raw):
         #going to clean the links a bit, most links have some query string stuff that isn't needed, exceept indeed, which has the job id in the query string.
         #doing this so that we lose all the unique tracking IDs or whatever on the link, so later on it'll be easier to see if we've already looked at a link.
         for output_link in output_links:
-            domain = tldextract.extract(output_link) #get domain by itself
-            domain = domain.domain
+            domain = get_domain(output_link) #get domain by itself
             if domain =="indeed":
                 output_links_clean.append(output_link.split("&rtk=", 1)[0]) #indeed keeps the job id in the query string, but the text after 'rtk' changes (and isn't needed), which would break our system of ignoring previously processed links
             else:
                 output_links_clean.append(output_link.split("?", 1)[0]) #toss everything after the question mark
+    else:
+        print(f"      Found    {len(output_links_clean)} jobs on {feed_domain.capitalize()}")
+        return 0 #if we didn't get any links, we'll return zero
+    
+    feed_domain = get_domain (feed_domain_raw)
 
+    print(f"      Found    {len(output_links_clean)} jobs on {feed_domain.capitalize()}")
     return output_links_clean
-
-
-#write out the feed
-def write_log_item(path,aggregator,keyword,timestamp,feed_raw): 
-    if not os.path.exists(f"{path}"):#make feed log subfolder folder if it doesn't exist
-        os.mkdir(f"{path}") 
-
-
-    domain = tldextract.extract(aggregator) #get domain by itself for feed logging filenames
-    domain = domain.domain
-
-
-    keyword_clean = re.sub('"','', keyword) #clean the keywords for logging filenames
-    keyword_clean = re.sub('[^a-zA-Z_-]','_', keyword_clean)
-
-
-    f = open(f"{path}/{domain}_k-{keyword_clean}_t-{int(time.time())}_uuid-{uuid.uuid4().hex}.txt", "w") #write out the raw feed for reference
-    f.write(feed_raw)
-    f.close()
-
 
 #download the feed using pyppeteer (some of the sites will return junk if you just do a standard download)
 def get_jorb(url):
-    #wrapper html class for part of the page we're interested in.
+
+    #this is a list of the html classes that wrap the job description on the various sites
     #find the smallest div with a class that wraps the entire job description
     jobsite_container_class={ 
         "indeed": "jobsearch-JobComponent",
@@ -102,28 +87,31 @@ def get_jorb(url):
         "insidehighered": "mds-surface",
         "hercjobs": "bti-job-detail-pane",
         "timeshighereducation": "js-job-detail",
+        "linkedin": "decorated-job-posting__details",
     }
 
-    domain = tldextract.extract(url)
-    domain = domain.domain
+    domain = get_domain(url)
 
-    
-    async def get_page(): #startin up the pyppeteer
-        browser = await launch()
-        page = await browser.newPage()
-
-        await stealth(page) #lookin at you indeed
-
-        await page.goto(url)
-
-        page = await page.content()
-        await browser.close()
-
-        return page
-
-    try:
-        page = asyncio.get_event_loop().run_until_complete(get_page()) #get the page raw output
-    except:
+    got_job = False
+    retry_times = 3
+    for i in range(retry_times): #try 3 times to get the page
+        async def get_page(): #startin up the pyppeteer
+            browser = await launch()
+            page = await browser.newPage()
+            await stealth(page) #lookin at you indeed
+            await page.goto(url)
+            page = await page.content()
+            await browser.close()
+            return page
+        try:
+            page = asyncio.get_event_loop().run_until_complete(get_page()) #get the page raw output
+            got_job = True
+            break
+        except PyppeteerError as e:
+            cprint(f"Error: in Pyppeteer occurred: {e}\nTrying {retry_times-i} more times", "magenta")
+            time.sleep(1) #sleeep for a second if we fail to get the page
+        
+    if not got_job:
         return False
 
     soup = BeautifulSoup(page,features="lxml") #start up beautifulsoup
@@ -133,7 +121,6 @@ def get_jorb(url):
         script_tags.extract()
     for style_tags in soup.select('style'): 
         style_tags.extract()
-
 
     #need to do some per-site cleaning to remove extra text:
     if domain == "hercjobs":
@@ -168,8 +155,7 @@ def get_jorb(url):
             text = elements[0].get_text(separator=' ') #get text but add spaces around elements
         except IndexError:
             text = soup.get_text(separator=' ') #if we don't find the container, we'll just get all the text, and throw an error
-            print(f"NOTE: {domain}'s container div wasn't found. might want to read the get_jorb function")
-        
+            cprint(f"NOTE: {domain}'s container div wasn't found. might want to read the get_jorb function", "magenta")
     else:
         print(f"NOTE: did not recognize jobsite {domain}, consider adding to get_jorb function")
         text = soup.get_text(separator=' ') #we'll just get all the text, and throw an error
@@ -180,11 +166,14 @@ def get_jorb(url):
     text = re.sub('\n+\s*\n+','\n', text) #remove extra linebreaks
     text = re.sub('\n\s+','\n', text) #remove spaces at the start of lines
     
+    if domain == "linkedin":
+        text = text.split("Show more\nShow less")[0]
+
     return text
 
 
 def write_jorb_csv_log(output,timestamp): #this is our output file 
-    filename = f"jorb_run_{timestamp}/collected_jorbs_{timestamp}.csv"
+    filename = f"collected_jorbs_{timestamp}.csv"
     if not os.path.exists(filename):#if the output file doesn't exist yet we'll add a header
         header = list(output.keys())
 
@@ -255,20 +244,19 @@ def gpt_jorb(jorb,open_ai_key,functions,field_name,relevance):
             completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
             reply = completion.choices[0].message.content #just get the reply message which is what we care about
 
+            #hopefully we get a true or false, but sometimes chatgpt does something weird, so we'll try to clean it up
             reply = re.sub("\n", ' ', reply) #remove linebreaks
             reply = re.sub(r'\s.+', '', reply) #seems like mostly when chatgpt does something weird here, it explains why it's true or false, we'll just drop everything after a space (ie "FALSE. This job is not..." to "FALSE.")
             reply = re.sub(r'[^a-zA-Z]', '', reply) #drop all non alpha from string
 
             arguments[field_name]=reply
-
         except:
             return False
-
         arguments = OrderedDict(sorted(arguments.items()))#sort our output
         return arguments
-    
     except:
         return False
+
 
 #text message function
 def send_text(phone,message,api_key):
@@ -281,3 +269,108 @@ def send_text(phone,message,api_key):
         return True
     except:
         return False
+    
+
+def get_linkedin_search(url):
+    async def get_feed_raw():  # startin up the pyppeteer
+        browser = await launch()
+        page = await browser.newPage()
+        await page.setViewport({"width": 3048, "height": 2160}) #bigger screen size seemed to make for less scrolling
+        await stealth(page)  # lookin at you indeed
+        await page.goto(url)
+
+        #check to see if there are any jobs, for whatever reason, linked in sometimes uses different text for this
+        is_text_visible = await page.evaluate('''() => {
+            return document.body.innerText.includes("No matching jobs found.");
+        }''')
+        if is_text_visible:
+             return 0
+        is_text_visible = await page.evaluate('''() => {
+            return document.body.innerText.includes("We couldn’t find a match");
+        }''')
+        if is_text_visible:
+            return 0
+        
+        click_failed = 0
+
+        scrolls = 350
+        for i in range(scrolls): #i had a while true here, but it's better if it fails eventually
+            #wait for the loader to disappear
+            #print(f"i:{i}")
+            for j in range(100):
+                #print(f"j:{j}")
+                is_visible = await page.evaluate(
+                    """() => {
+                    let loader = document.querySelector('.loader');
+                    if (!loader) return false;
+                    let style = window.getComputedStyle(loader);
+                    return style.display !== 'none';
+                }"""
+                )
+                if not is_visible:
+                    break  # If the loader is not visible, break the loop
+                else:
+                    await asyncio.sleep( rand_sleep() ) #if the loader is visible sleep for a short random time
+
+            #scroll the page by the page height
+            await page.evaluate("window.scrollBy(0, window.innerHeight)")
+
+            #going to try and click the show more button, but it isn't visible until you've scrolled a long ways, so we'll keep trying until we can click it
+            try:
+                await asyncio.sleep( rand_sleep() )  #Sleep before we click for a short random time
+                await page.click(".infinite-scroller__show-more-button") #try clicking, if it fails, we bounce to the except below, otherwise we break out of the loop
+            except:
+                click_failed += 1
+
+            #this text appears at the bottom of the results, if we see it we break
+            is_text_visible = await page.evaluate(
+                """() => {
+                return document.body.innerText.includes("You've viewed all jobs for this search");
+            }"""
+            )
+            if is_text_visible:
+                break  # If the element is found, break the loop
+
+        if i > (scrolls-5):
+            print(f"Warning: We scrolled {scrolls} times and didn't find the end of the page, maybe make your keyword more specificor open the link to see if there's something else going on.")
+
+
+        feed_raw = await page.content() #get the page content
+        await browser.close()
+        return feed_raw #to the try below
+
+    try:
+        feed_raw = asyncio.get_event_loop().run_until_complete(
+            get_feed_raw()
+        )  
+    except:
+        cprint("ERROR: get_feed_raw failed", "magenta")
+        return False
+
+    if len(str(feed_raw)) > 100: #sometimes feed_raw comes out as an int?
+        #start up beautifulsoup parser
+        soup = BeautifulSoup(feed_raw, "html.parser")
+        divs = soup.find_all("div", attrs={"data-entity-urn": True}) #linked in keeps the job id in the div attributes, so we'll grab that
+
+        jobs = []
+        for div in divs:
+            job_id = div["data-entity-urn"].split(":")[-1] #get the job id, in the site it looks like "data-entity-urn="urn:li:jobPosting:3755470964", we need that number at the end
+            jobs.append(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}")
+        print(f"      Found    {len(jobs)} jobs on linkedin")#show the jobs count
+
+        if(len(jobs) == 0): #if we didn't find any jobs, we'll return 0
+            return 0
+        return jobs
+    else:
+        cprint("ERROR: get_feed_raw seemed to work, but didn't return full results", "magenta")
+        print(f"feed_raw: {feed_raw}")
+        return False
+
+#get the domain by itself ie "https://www.asdf.com/qwerty" returns just "asdf"
+def get_domain(url): 
+    domain = tldextract.extract(url)
+    domain = domain.domain
+    return domain
+
+def rand_sleep():
+    return random.uniform(0.1, 0.3)

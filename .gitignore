@@ -11,3 +11,6 @@ __pycache__/*
 *.sh
 old/*
 in*.py
+li*.py
+*.backup
+gen*.py
