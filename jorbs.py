@@ -52,6 +52,7 @@ for keyword in search_keywords:
             job_links = get_linkedin_search(url)
 
         no_jobs_found = 0
+        job_counter = 1
         if isinstance(job_links, list): #make sure the item is a list
             skipped_jobs=0
             not_skipped_jobs=0
@@ -74,7 +75,7 @@ for keyword in search_keywords:
                             cprint(f"        {search_keyword} found in job description, starting gpt","green") #if we do find the keyword, we'll fire up chatgpt
                             read_job = gpt_jorb(job_description,open_ai_key,functions,relevance_field_name,relevance)
                         else: #if we don't find the keyword, we'll skip the job, and write it out to our already processed jobs file and our skip list
-                            print(f"    job: {job_link}")
+                            print(f"      {job_counter}: {job_link}")
                             print(f"      none of the keywords were found in the job description")
                             read_job = False
 
@@ -83,7 +84,8 @@ for keyword in search_keywords:
                             file1.close()
 
                             job_links_skip.append(job_link) #append the url of the job, so if it comes up in this run again, we skip it
-                        
+                            job_counter += 1
+
                         if read_job:
                             for key, value in read_job.items():
                                 # Convert value to string

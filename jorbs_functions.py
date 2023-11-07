@@ -286,7 +286,7 @@ def get_linkedin_search(url):
         if is_text_visible:
              return 0
         is_text_visible = await page.evaluate('''() => {
-            return document.body.innerText.includes("We couldn’t find a match");
+            return document.body.innerText.includes("Please make sure your keywords are spelled correctly");
         }''')
         if is_text_visible:
             return 0
