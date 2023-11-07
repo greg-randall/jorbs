@@ -10,6 +10,7 @@ from jorbs_functions import *
 
 #randomize list order, breaks the pattern up of us searching the websites 
 random.shuffle(search_keywords)
+random.shuffle(aggregators_rss)
 
 timestamp = int(time.time()) #have a conistent timestamp for all of the logging from the start of the run
 
@@ -30,7 +31,6 @@ text_sent = False #we'll check to see if any texts were sent, if none were we'll
 
 for keyword in search_keywords:
     cprint(f"keyword: {keyword}", "red")
-    random.shuffle(aggregators_rss) #randomize the order of the aggregators, so we don't hit the same one first every time
     for aggregator in aggregators_rss:
         
         domain = get_domain(aggregator)
@@ -76,7 +76,7 @@ for keyword in search_keywords:
                             read_job = gpt_jorb(job_description,open_ai_key,functions,relevance_field_name,relevance)
                         else: #if we don't find the keyword, we'll skip the job, and write it out to our already processed jobs file and our skip list
                             print(f"      {job_counter}: {job_link}")
-                            print(f"      none of the keywords were found in the job description")
+                            print(f"        none of the keywords were found in the job description")
                             read_job = False
 
                             file1 = open("already_parsed_jobs.txt", "a")  #output the url of the job so we don't do it again in future runs
@@ -92,7 +92,7 @@ for keyword in search_keywords:
                                 value = str(value)
                                 wrapped_value = textwrap.fill(value, width=80, subsequent_indent='            ',initial_indent='            ')
                                 cprint(f"          {key}:\n{wrapped_value}","green")
-
+                            print("\n")
                             #add datetime and the link to our job info for output
                             read_job['1_date_time'] = time.strftime("%m-%d-%Y %I:%M%p")
                             read_job['2_job_link'] = job_link

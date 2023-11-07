@@ -205,7 +205,8 @@ def gpt_jorb(jorb,open_ai_key,functions,field_name,relevance):
         openai.api_key = open_ai_key
         response = openai.ChatCompletion.create(
             #model = "gpt-3.5-turbo-0613",
-            model = "gpt-4-0613",
+            #model = "gpt-4-0613",
+            model = "gpt-4-1106-preview",
             messages = [
                 {
                     "role": "system",
@@ -241,7 +242,7 @@ def gpt_jorb(jorb,open_ai_key,functions,field_name,relevance):
             prompt = f"{relevance}\n\nJob Title:\n{arguments['job-title']}\n\nJob Description:\n{arguments['summary']}\n\nJob Requirements:\n{arguments['requirements']}" #build our prompt
 
             openai.api_key = open_ai_key
-            completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
+            completion = openai.ChatCompletion.create(model="gpt-4-1106-preview", messages=[{"role": "user", "content": prompt}])
             reply = completion.choices[0].message.content #just get the reply message which is what we care about
 
             #hopefully we get a true or false, but sometimes chatgpt does something weird, so we'll try to clean it up
@@ -293,8 +294,13 @@ def get_linkedin_search(url):
         
         click_failed = 0
 
-        scrolls = 1000
+        scrolls = 5000
+        time_of_scrolls = int(time.time())
         for i in range(scrolls): #i had a while true here, but it's better if it fails eventually
+            if time.time()-time_of_scrolls > 15 and i%100 == 0: #if we've been waiting for 30 seconds let folks know it's still running
+                print(f"      Linkedin still scrolling after {round(time.time()-time_of_scrolls)} seconds")
+
+
             #wait for the loader to disappear
             #print(f"i:{i}")
             for j in range(100):
@@ -373,4 +379,4 @@ def get_domain(url):
     return domain
 
 def rand_sleep():
-    return random.uniform(0.01, 0.1)
+    return random.uniform(0.01, 0.05)
