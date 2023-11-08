@@ -23,16 +23,31 @@ aggregators_rss = [
     "https://main.hercjobs.org/jobs/?display=rss&keywords=",
     "http://rss.indeed.com/rss?q=",
     "https://www.linkedin.com/jobs/search/?keywords=",
+    "http://public.api.careerjet.net/search"
+
 ]
 
 
 
 #search keywords, add in double quotes as needed, note site support might differ somewhat, possibly ignoring quotes
 search_keywords = [
-    '"artist\'s books"',
-    '"book arts"',
-    'bookbinding',
     'letterpress',
+    '"book arts"',
+    '"artist books"',
+    '"artist\'s books"',
+    '"book binding"',
+    'bookbinding',
+    '"book conservation"',
+    'papermaking',
+    'bookbinder',
+    '"book conservator"',
+    '"fine press"',
+    'hand-bound books',
+    'book restoration',
+    'artisan books',
+    'tropic bound',
+    'art book fair',
+    'codex book fair',
     ]
 
 

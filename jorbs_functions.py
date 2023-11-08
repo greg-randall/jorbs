@@ -48,7 +48,6 @@ def get_links_from_feed(feed_raw):
     output_links = []
     output_links_clean = []
     if len(raw_links)>1: #make sure we actually got some links
-
         for link in raw_links:
             link = re.sub('</?link>','', link) #remove the link tag from around the link
             link = html.unescape(link) #xml requires that ampersands be escaped, fixing that for our links
@@ -88,6 +87,7 @@ def get_jorb(url):
         "hercjobs": "bti-job-detail-pane",
         "timeshighereducation": "js-job-detail",
         "linkedin": "decorated-job-posting__details",
+        "careerjet": "container",
     }
 
     domain = get_domain(url)
@@ -117,11 +117,8 @@ def get_jorb(url):
     soup = BeautifulSoup(page,features="lxml") #start up beautifulsoup
 
     #remove script and style tags, sometimes since we're getting the text out of all the tags, these get mixed in sometimes and give a lot of bad data
-    for script_tags in soup.select('script'): 
-        script_tags.extract()
-    for style_tags in soup.select('style'): 
-        style_tags.extract()
-
+    soup = bs_remove_tags(soup, ['script','style'])
+    
     #need to do some per-site cleaning to remove extra text:
     if domain == "hercjobs":
         for div in soup.find_all("div", {'class':'d-print-none'}): 
@@ -148,6 +145,11 @@ def get_jorb(url):
             span.decompose()
         for div in soup.find_all("div", {'job-sticky-ctas'}):
             div.decompose()
+    if domain == "careerjet":
+        soup = bs_remove_tags_by_class(soup, 'section', 'fwd')
+        soup = bs_remove_tags_by_class(soup, 'section', 'actions')
+        soup = bs_remove_tags_by_class(soup, 'section', 'nav')
+        soup = bs_remove_tags_by_class(soup, 'p', 'source')
 
     if domain in jobsite_container_class.keys(): #see if we see the current domain in our list of domains that we have classes for
         elements = soup.find_all("div", class_ = jobsite_container_class[domain]) #find the container
@@ -171,6 +173,16 @@ def get_jorb(url):
 
     return text
 
+def bs_remove_tags(soup, tags):
+    for tag in tags:
+        for match in soup.findAll(tag):
+            match.replaceWithChildren()
+    return soup
+
+def bs_remove_tags_by_class(soup, tag, class_name):
+    for item in soup.find_all(tag, {class_name}):
+        item.decompose()
+    return soup
 
 def write_jorb_csv_log(output,timestamp): #this is our output file 
     filename = f"collected_jorbs_{timestamp}.csv"
@@ -242,7 +254,7 @@ def gpt_jorb(jorb,open_ai_key,functions,field_name,relevance):
             prompt = f"{relevance}\n\nJob Title:\n{arguments['job-title']}\n\nJob Description:\n{arguments['summary']}\n\nJob Requirements:\n{arguments['requirements']}" #build our prompt
 
             openai.api_key = open_ai_key
-            completion = openai.ChatCompletion.create(model="gpt-4-1106-preview", messages=[{"role": "user", "content": prompt}])
+            completion = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}])
             reply = completion.choices[0].message.content #just get the reply message which is what we care about
 
             #hopefully we get a true or false, but sometimes chatgpt does something weird, so we'll try to clean it up
@@ -280,25 +292,29 @@ def get_linkedin_search(url):
         await stealth(page)  # lookin at you indeed
         await page.goto(url)
 
-        #check to see if there are any jobs, for whatever reason, linked in sometimes uses different text for this
-        is_text_visible = await page.evaluate('''() => {
-            return document.body.innerText.includes("No matching jobs found.");
-        }''')
-        if is_text_visible:
-             return 0
-        is_text_visible = await page.evaluate('''() => {
-            return document.body.innerText.includes("Please make sure your keywords are spelled correctly");
-        }''')
-        if is_text_visible:
+        if len(await page.content()) < 100: #if the page is less than 100 characters, something went wrong, so we'll return 0
+            cprint("ERROR: the linkedin page didn't load", "magenta")
             return 0
+
+        #check to see if there are any jobs, for whatever reason, linked in sometimes uses different text for this
+        no_results_texts = ["No matching jobs found.","Please make sure your keywords are spelled correctly"]
+        for no_results_text in no_results_texts:
+            is_text_visible = await page.evaluate('''() => {
+                return document.body.innerText.includes("No matching jobs found.");
+            }''')
+            if is_text_visible:
+                return 0
         
         click_failed = 0
 
-        scrolls = 5000
+        scrolls = 1500
         time_of_scrolls = int(time.time())
+        current_second = time_of_scrolls
         for i in range(scrolls): #i had a while true here, but it's better if it fails eventually
-            if time.time()-time_of_scrolls > 15 and i%100 == 0: #if we've been waiting for 30 seconds let folks know it's still running
-                print(f"      Linkedin still scrolling after {round(time.time()-time_of_scrolls)} seconds")
+            if (int(time.time())-time_of_scrolls)%30 == 0 and not current_second == int(time.time()): #if we've been waiting for for a while, lets give an update
+                print(f"      Linkedin still scrolling after {round(time.time()-time_of_scrolls)} seconds. {i}/{scrolls} scrolls left")
+                current_second = int(time.time())
+            
 
 
             #wait for the loader to disappear
@@ -338,7 +354,7 @@ def get_linkedin_search(url):
                 break  # If the element is found, break the loop
 
         if i > (scrolls-5):
-            print(f"Warning: We scrolled {scrolls} times and didn't find the end of the page, maybe make your keyword more specificor open the link to see if there's something else going on.")
+            cprint(f"Warning: We scrolled {scrolls} times and didn't find the end of the page, maybe make your keyword more specifi cor open the link to see if there's something else going on.","BLUE")
 
 
         feed_raw = await page.content() #get the page content
@@ -380,3 +396,54 @@ def get_domain(url):
 
 def rand_sleep():
     return random.uniform(0.01, 0.05)
+
+
+
+#https://github.com/careerjet/careerjet-api-client-python didn't use their librarysince it's just a simple request, but this has info about the api
+def get_careerjet_jobs(search_term, page):
+    url = "http://public.api.careerjet.net/search"
+    params = {
+        'locale_code': 'en_US',
+        'keywords': search_term,
+        'user_ip': '192.168.1.1',
+        'user_agent': 'python3.8',
+        'pagesize': '100',
+        'page':{page},
+    }
+    response = requests.get(url, params=params)
+    return response.json()
+
+#the json returns a link that has a redirect, but it turns out it just swaps some bits around, so we generate that link here to save time on requests later
+def careerjet_convert_url_to_page(url):
+    # Split the URL by periods and slashes
+    parts = re.split('[./]', url)
+    # Get the second to last item
+    second_last_item = parts[-2] if len(parts) > 1 else None
+    return f"https://www.careerjet.com/jobad/us{second_last_item}"
+
+
+def get_careerjet_job_links(search_term):
+    #get the first page of results
+    response = get_careerjet_jobs(search_term, 1)
+
+    #make sure that there are jobs in the response
+    if response['hits'] >= 1:
+        pages = response['pages']
+        output = []
+
+        #collect the jobs from the first page
+        for job in response['jobs']: 
+            output.append(careerjet_convert_url_to_page(job['url']))
+
+        #collect the jobs from the remaining pages
+        for i in range(2, pages):
+            for job in response['jobs']:
+                output.append(careerjet_convert_url_to_page(job['url']))
+        
+        feed_domain = get_domain (output[0])
+
+        print(f"      Found    {len(output)} jobs on {feed_domain.capitalize()}")
+        return output
+    else:
+        return 0
+    
